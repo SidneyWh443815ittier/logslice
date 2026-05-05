@@ -1,61 +1,56 @@
 package reader
 
 import (
-	"io"
-
 	"github.com/user/logslice/internal/filter"
+	"github.com/user/logslice/internal/output"
+	"github.com/user/logslice/internal/stats"
 	"github.com/user/logslice/internal/timerange"
 )
 
-// Options holds filtering parameters for a scan pipeline.
-type Options struct {
-	Range   *timerange.Range
-	Queries []*filter.Query
+// RunOptions configures a pipeline execution.
+type RunOptions struct {
+	Scanner   *Scanner
+	Range     *timerange.Range
+	Query     *filter.Query
+	Formatter *output.Formatter
+	Stats     *stats.Collector
 }
 
-// Result represents a matched log line.
-type Result struct {
-	LineNumber int
-	Text       string
-}
+// Run reads lines from the scanner, applies time-range and field filters,
+// and writes matching lines via the formatter. It returns the number of
+// matched lines and any write error encountered.
+func Run(opts RunOptions) (int64, error) {
+	var matched int64
 
-// Run scans the reader r, applying time range and field query filters,
-// and sends matching lines to the returned channel. The channel is
-// closed when scanning is complete or the reader is exhausted.
-func Run(r io.Reader, opts Options) (<-chan Result, <-chan error) {
-	results := make(chan Result, 64)
-	errs := make(chan error, 1)
+	for opts.Scanner.Scan() {
+		line := opts.Scanner.Text()
+		lineNum := opts.Scanner.LineNumber()
 
-	go func() {
-		defer close(results)
-		defer close(errs)
-
-		s := NewScanner(r)
-		for s.Scan() {
-			line := s.Line()
-
-			if opts.Range != nil && !timerange.LineInRange(line, opts.Range) {
-				continue
+		// Time-range filter
+		if opts.Range != nil && !timerange.LineInRange(line, opts.Range) {
+			if opts.Stats != nil {
+				opts.Stats.RecordLine(len(line), false)
 			}
-
-			matched := true
-			for _, q := range opts.Queries {
-				if !q.Matches(line) {
-					matched = false
-					break
-				}
-			}
-			if !matched {
-				continue
-			}
-
-			results <- Result{LineNumber: s.LineNumber(), Text: line}
+			continue
 		}
 
-		if err := s.Err(); err != nil {
-			errs <- err
+		// Field query filter
+		if opts.Query != nil && !opts.Query.Matches(line) {
+			if opts.Stats != nil {
+				opts.Stats.RecordLine(len(line), false)
+			}
+			continue
 		}
-	}()
 
-	return results, errs
+		if opts.Stats != nil {
+			opts.Stats.RecordLine(len(line), true)
+		}
+
+		if err := opts.Formatter.Write(line, lineNum); err != nil {
+			return matched, err
+		}
+		matched++
+	}
+
+	return matched, opts.Scanner.Err()
 }
