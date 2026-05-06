@@ -59,3 +59,20 @@ func TestWatcher_MissingFile(t *testing.T) {
 		t.Error("expected error for missing file, got nil")
 	}
 }
+
+func TestWatcher_StopIsIdempotent(t *testing.T) {
+	f, err := os.CreateTemp(t.TempDir(), "logslice-tail-*.log")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+
+	w := tail.NewWatcher(f.Name(), 20*time.Millisecond)
+	if err := w.Start(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Calling Stop multiple times should not panic or block.
+	w.Stop()
+	w.Stop()
+}
