@@ -27,9 +27,10 @@ type Query struct {
 }
 
 // ParseQuery parses a slice of filter expressions of the form:
-//   field=value     (exact match)
-//   field~value     (contains)
-//   field^value     (prefix match)
+//
+//	field=value     (exact match)
+//	field~value     (contains)
+//	field^value     (prefix match)
 func ParseQuery(exprs []string) (*Query, error) {
 	q := &Query{}
 	for _, expr := range exprs {
@@ -78,4 +79,28 @@ func (q *Query) Matches(fields map[string]string) bool {
 		}
 	}
 	return true
+}
+
+// IsEmpty reports whether the query has no conditions.
+func (q *Query) IsEmpty() bool {
+	return len(q.Conditions) == 0
+}
+
+// String returns a human-readable representation of the query.
+func (q *Query) String() string {
+	if q.IsEmpty() {
+		return "<empty query>"
+	}
+	parts := make([]string, len(q.Conditions))
+	for i, c := range q.Conditions {
+		switch c.Op {
+		case OpEquals:
+			parts[i] = c.Field + "=" + c.Value
+		case OpContains:
+			parts[i] = c.Field + "~" + c.Value
+		case OpPrefix:
+			parts[i] = c.Field + "^" + c.Value
+		}
+	}
+	return strings.Join(parts, " AND ")
 }
