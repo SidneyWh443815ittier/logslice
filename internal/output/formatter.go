@@ -73,3 +73,15 @@ func (f *Formatter) writeColor(line string) error {
 	_, err := fmt.Fprintln(f.w, result)
 	return err
 }
+
+// WriteAll emits multiple log lines sequentially, stopping on the first error.
+// lineOffset is added to the index to produce the absolute line number for
+// each entry, which is relevant in FormatJSON mode.
+func (f *Formatter) WriteAll(lines []string, lineOffset uint64) error {
+	for i, line := range lines {
+		if err := f.Write(lineOffset+uint64(i), line); err != nil {
+			return fmt.Errorf("writing line %d: %w", lineOffset+uint64(i), err)
+		}
+	}
+	return nil
+}
