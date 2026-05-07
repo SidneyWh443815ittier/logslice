@@ -104,3 +104,12 @@ func (q *Query) String() string {
 	}
 	return strings.Join(parts, " AND ")
 }
+
+// Add appends a new condition to the query and returns the query for chaining.
+func (q *Query) Add(field, value string, op Op) (*Query, error) {
+	if field == "" {
+		return nil, fmt.Errorf("empty field name")
+	}
+	q.Conditions = append(q.Conditions, Condition{Field: field, Value: value, Op: op})
+	return q, nil
+}
