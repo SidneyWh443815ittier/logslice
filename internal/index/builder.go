@@ -63,3 +63,15 @@ func (idx *Index) FilterByRange(r timerange.Range) []Entry {
 	}
 	return result
 }
+
+// FilterByRangeStrict returns only entries that have a timestamp and fall within the given range.
+// Unlike FilterByRange, entries without a timestamp are excluded.
+func (idx *Index) FilterByRangeStrict(r timerange.Range) []Entry {
+	var result []Entry
+	for _, e := range idx.Entries {
+		if e.HasTime && timerange.LineInRange(e.Timestamp, r) {
+			result = append(result, e)
+		}
+	}
+	return result
+}
